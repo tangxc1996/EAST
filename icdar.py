@@ -55,7 +55,9 @@ def load_annoataion(p):
         reader = csv.reader(f)
         for line in reader:
             label = line[-1]
-            line = [i.strip('\ufeff') for i in line]  # strip BOM
+            # strip BOM. \ufeff for python3,  \xef\xbb\bf for python2
+            line = [i.strip('\ufeff').strip('\xef\xbb\xbf') for i in line]
+
             x1, y1, x2, y2, x3, y3, x4, y4 = list(map(float, line[:8]))
             text_polys.append([[x1, y1], [x2, y2], [x3, y3], [x4, y4]])
             if label == '*' or label == '###':
@@ -189,25 +191,25 @@ def shrink_poly(poly, r):
                     np.linalg.norm(poly[0] - poly[3]) + np.linalg.norm(poly[1] - poly[2]):
         # first move (p0, p1), (p2, p3), then (p0, p3), (p1, p2)
         ## p0, p1
-        theta = np.arctan((poly[1][1] - poly[0][1]) / (poly[1][0] - poly[0][0]))
+        theta = np.arctan2((poly[1][1] - poly[0][1]), (poly[1][0] - poly[0][0]))
         poly[0][0] += R * r[0] * np.cos(theta)
         poly[0][1] += R * r[0] * np.sin(theta)
         poly[1][0] -= R * r[1] * np.cos(theta)
         poly[1][1] -= R * r[1] * np.sin(theta)
         ## p2, p3
-        theta = np.arctan((poly[2][1] - poly[3][1]) / (poly[2][0] - poly[3][0]))
+        theta = np.arctan2((poly[2][1] - poly[3][1]), (poly[2][0] - poly[3][0]))
         poly[3][0] += R * r[3] * np.cos(theta)
         poly[3][1] += R * r[3] * np.sin(theta)
         poly[2][0] -= R * r[2] * np.cos(theta)
         poly[2][1] -= R * r[2] * np.sin(theta)
         ## p0, p3
-        theta = np.arctan((poly[3][0] - poly[0][0]) / (poly[3][1] - poly[0][1]))
+        theta = np.arctan2((poly[3][0] - poly[0][0]), (poly[3][1] - poly[0][1]))
         poly[0][0] += R * r[0] * np.sin(theta)
         poly[0][1] += R * r[0] * np.cos(theta)
         poly[3][0] -= R * r[3] * np.sin(theta)
         poly[3][1] -= R * r[3] * np.cos(theta)
         ## p1, p2
-        theta = np.arctan((poly[2][0] - poly[1][0]) / (poly[2][1] - poly[1][1]))
+        theta = np.arctan2((poly[2][0] - poly[1][0]), (poly[2][1] - poly[1][1]))
         poly[1][0] += R * r[1] * np.sin(theta)
         poly[1][1] += R * r[1] * np.cos(theta)
         poly[2][0] -= R * r[2] * np.sin(theta)
@@ -215,25 +217,25 @@ def shrink_poly(poly, r):
     else:
         ## p0, p3
         # print poly
-        theta = np.arctan((poly[3][0] - poly[0][0]) / (poly[3][1] - poly[0][1]))
+        theta = np.arctan2((poly[3][0] - poly[0][0]), (poly[3][1] - poly[0][1]))
         poly[0][0] += R * r[0] * np.sin(theta)
         poly[0][1] += R * r[0] * np.cos(theta)
         poly[3][0] -= R * r[3] * np.sin(theta)
         poly[3][1] -= R * r[3] * np.cos(theta)
         ## p1, p2
-        theta = np.arctan((poly[2][0] - poly[1][0]) / (poly[2][1] - poly[1][1]))
+        theta = np.arctan2((poly[2][0] - poly[1][0]), (poly[2][1] - poly[1][1]))
         poly[1][0] += R * r[1] * np.sin(theta)
         poly[1][1] += R * r[1] * np.cos(theta)
         poly[2][0] -= R * r[2] * np.sin(theta)
         poly[2][1] -= R * r[2] * np.cos(theta)
         ## p0, p1
-        theta = np.arctan((poly[1][1] - poly[0][1]) / (poly[1][0] - poly[0][0]))
+        theta = np.arctan2((poly[1][1] - poly[0][1]), (poly[1][0] - poly[0][0]))
         poly[0][0] += R * r[0] * np.cos(theta)
         poly[0][1] += R * r[0] * np.sin(theta)
         poly[1][0] -= R * r[1] * np.cos(theta)
         poly[1][1] -= R * r[1] * np.sin(theta)
         ## p2, p3
-        theta = np.arctan((poly[2][1] - poly[3][1]) / (poly[2][0] - poly[3][0]))
+        theta = np.arctan2((poly[2][1] - poly[3][1]), (poly[2][0] - poly[3][0]))
         poly[3][0] += R * r[3] * np.cos(theta)
         poly[3][1] += R * r[3] * np.sin(theta)
         poly[2][0] -= R * r[2] * np.cos(theta)
@@ -352,14 +354,14 @@ def sort_rectangle(poly):
     # First find the lowest point
     p_lowest = np.argmax(poly[:, 1])
     if np.count_nonzero(poly[:, 1] == poly[p_lowest, 1]) == 2:
-        # 底边平行于X轴, 那么p0为左上角
+        # 底边平行于X轴, 那么p0为左上角 - if the bottom line is parallel to x-axis, then p0 must be the upper-left corner
         p0_index = np.argmin(np.sum(poly, axis=1))
         p1_index = (p0_index + 1) % 4
         p2_index = (p0_index + 2) % 4
         p3_index = (p0_index + 3) % 4
         return poly[[p0_index, p1_index, p2_index, p3_index]], 0.
     else:
-        # 找到最低点右边的点
+        # 找到最低点右边的点 - find the point that sits right to the lowest point
         p_lowest_right = (p_lowest - 1) % 4
         p_lowest_left = (p_lowest + 1) % 4
         angle = np.arctan(-(poly[p_lowest][1] - poly[p_lowest_right][1])/(poly[p_lowest][0] - poly[p_lowest_right][0]))
@@ -367,14 +369,14 @@ def sort_rectangle(poly):
         if angle <= 0:
             print(angle, poly[p_lowest], poly[p_lowest_right])
         if angle/np.pi * 180 > 45:
-            # 这个点为p2
+            # 这个点为p2 - this point is p2
             p2_index = p_lowest
             p1_index = (p2_index - 1) % 4
             p0_index = (p2_index - 2) % 4
             p3_index = (p2_index + 1) % 4
             return poly[[p0_index, p1_index, p2_index, p3_index]], -(np.pi/2 - angle)
         else:
-            # 这个点为p3
+            # 这个点为p3 - this point is p3
             p3_index = p_lowest
             p0_index = (p3_index + 1) % 4
             p1_index = (p3_index + 2) % 4
@@ -487,7 +489,7 @@ def generate_rbox(im_size, polys, tags):
 
         xy_in_poly = np.argwhere(poly_mask == (poly_idx + 1))
         # if geometry == 'RBOX':
-        # 对任意两个顶点的组合生成一个平行四边形
+        # 对任意两个顶点的组合生成一个平行四边形 - generate a parallelogram for any combination of two vertices
         fitted_parallelograms = []
         for i in range(4):
             p0 = poly[i]
@@ -498,13 +500,13 @@ def generate_rbox(im_size, polys, tags):
             backward_edge = fit_line([p0[0], p3[0]], [p0[1], p3[1]])
             forward_edge = fit_line([p1[0], p2[0]], [p1[1], p2[1]])
             if point_dist_to_line(p0, p1, p2) > point_dist_to_line(p0, p1, p3):
-                # 平行线经过p2
+                # 平行线经过p2 - parallel lines through p2
                 if edge[1] == 0:
                     edge_opposite = [1, 0, -p2[0]]
                 else:
                     edge_opposite = [edge[0], -1, p2[1] - edge[0] * p2[0]]
             else:
-                # 经过p3
+                # 经过p3 - after p3
                 if edge[1] == 0:
                     edge_opposite = [1, 0, -p3[0]]
                 else:
@@ -601,6 +603,7 @@ def generator(input_size=512, batch_size=32,
                 h, w, _ = im.shape
                 txt_fn = im_fn.replace(os.path.basename(im_fn).split('.')[1], 'txt')
                 if not os.path.exists(txt_fn):
+                    print('text file {} does not exists'.format(txt_fn))
                     continue
 
                 text_polys, text_tags = load_annoataion(txt_fn)
@@ -719,7 +722,8 @@ def generator(input_size=512, batch_size=32,
 def get_batch(num_workers, **kwargs):
     try:
         enqueuer = GeneratorEnqueuer(generator(**kwargs), use_multiprocessing=True)
-        enqueuer.start(max_queue_size=24, workers=num_workers)
+        print('Generator use 10 batches for buffering, this may take a while, you can tune this yourself.')
+        enqueuer.start(max_queue_size=10, workers=num_workers)
         generator_output = None
         while True:
             while enqueuer.is_running():
